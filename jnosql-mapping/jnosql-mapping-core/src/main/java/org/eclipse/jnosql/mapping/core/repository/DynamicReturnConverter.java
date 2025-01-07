@@ -15,6 +15,7 @@
 package org.eclipse.jnosql.mapping.core.repository;
 
 import jakarta.data.page.PageRequest;
+
 import org.eclipse.jnosql.mapping.PreparedStatement;
 import org.eclipse.jnosql.mapping.core.NoSQLPage;
 
@@ -22,12 +23,14 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
  * The converter within the return method at Repository class.
  */
-enum DynamicReturnConverter {
+public enum DynamicReturnConverter {
 
     INSTANCE;
 
@@ -73,11 +76,16 @@ enum DynamicReturnConverter {
         Function<String, PreparedStatement> prepareConverter = dynamicQueryMethod.prepareConverter();
         Class<?> typeClass = dynamicQueryMethod.typeClass();
 
-        String value = RepositoryReflectionUtils.INSTANCE.getQuery(method);
+        String queryString = RepositoryReflectionUtils.INSTANCE.getQuery(method);
 
         Map<String, Object> params = RepositoryReflectionUtils.INSTANCE.getParams(method, args);
-        PreparedStatement prepare = prepareConverter.apply(value);
-        params.forEach(prepare::bind);
+        boolean namedParameters = queryContainsNamedParameters(queryString);
+        PreparedStatement prepare = prepareConverter.apply(queryString);
+                    params.entrySet().stream()
+                        .filter(namedParameters ?
+                                        (parameter -> !isOrdinalParameter(parameter))
+                                        : parameter -> isOrdinalParameter(parameter))
+                        .forEach(param -> prepare.bind(param.getKey(), param.getValue()));
 
         if (prepare.isCount()) {
             return prepare.count();
@@ -100,4 +108,20 @@ enum DynamicReturnConverter {
 
         return convert(dynamicReturn);
     }
+
+    private static boolean queryContainsNamedParameters(String queryString) {
+        final String ordinalParameterPattern = "\\?\\d+";
+        final String identifierFirstCharacterPattern = "(\\p{Alpha}|_|$)";
+        final String identifierAfterFirstCharacterpattern = "\\p{Alnum}|_|$";
+        String namedParameterPattern = ":" + identifierFirstCharacterPattern
+                + "(" + identifierAfterFirstCharacterpattern + ")*";
+        Pattern p = Pattern.compile("(" + ordinalParameterPattern + ")|(" + namedParameterPattern + ")");
+        Matcher m = p.matcher(queryString);
+        return m.find() && m.group().startsWith(":");
+    }
+
+    private static boolean isOrdinalParameter(Map.Entry<String, Object> parameter) {
+        return parameter.getKey().startsWith("?");
+    }
+
 }
