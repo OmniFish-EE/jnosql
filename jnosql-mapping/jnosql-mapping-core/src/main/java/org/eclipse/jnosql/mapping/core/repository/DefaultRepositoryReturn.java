@@ -23,11 +23,30 @@ class DefaultRepositoryReturn implements RepositoryReturn {
 
     @Override
     public <T> Object convert(DynamicReturn<T> dynamicReturn) {
+        final Class<?> returnType = dynamicReturn.getMethod().getReturnType();
+        if (isNumberType(returnType)) {
+            return dynamicReturn.singleResult().get();
+        }
         return dynamicReturn.result();
     }
 
     @Override
     public <T> Object convertPageRequest(DynamicReturn<T> dynamicReturn) {
         return dynamicReturn.streamPagination();
+    }
+
+    public static boolean isNumberType(Class<?> clazz) {
+        // Check if it's a primitive numeric type
+        if (clazz.isPrimitive()) {
+            return clazz == byte.class
+                    || clazz == short.class
+                    || clazz == int.class
+                    || clazz == long.class
+                    || clazz == float.class
+                    || clazz == double.class;
+        }
+
+        // Check if it's a Number subclass
+        return Number.class.isAssignableFrom(clazz);
     }
 }
