@@ -20,7 +20,6 @@ import org.eclipse.jnosql.communication.Condition;
 import org.eclipse.jnosql.communication.query.ArrayQueryValue;
 import org.eclipse.jnosql.communication.query.BooleanQueryValue;
 import org.eclipse.jnosql.communication.query.ConditionQueryValue;
-import org.eclipse.jnosql.communication.query.ParamQueryValue;
 import org.eclipse.jnosql.communication.query.QueryCondition;
 import org.eclipse.jnosql.communication.query.QueryErrorListener;
 import org.eclipse.jnosql.communication.query.StringQueryValue;
@@ -38,12 +37,17 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import org.eclipse.jnosql.communication.query.ParamQueryValue;
+
 import static java.util.stream.Collectors.joining;
 import static org.eclipse.jnosql.communication.Condition.AND;
 import static org.eclipse.jnosql.communication.Condition.BETWEEN;
+import static org.eclipse.jnosql.communication.Condition.CONTAINS;
+import static org.eclipse.jnosql.communication.Condition.ENDS_WITH;
 import static org.eclipse.jnosql.communication.Condition.EQUALS;
 import static org.eclipse.jnosql.communication.Condition.GREATER_EQUALS_THAN;
 import static org.eclipse.jnosql.communication.Condition.GREATER_THAN;
+import static org.eclipse.jnosql.communication.Condition.IGNORE_CASE;
 import static org.eclipse.jnosql.communication.Condition.IN;
 import static org.eclipse.jnosql.communication.Condition.LESSER_EQUALS_THAN;
 import static org.eclipse.jnosql.communication.Condition.LESSER_THAN;
@@ -91,86 +95,66 @@ abstract class AbstractMethodQueryProvider extends MethodBaseListener {
 
     @Override
     public void exitEq(MethodParser.EqContext ctx) {
-        Condition operator = EQUALS;
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(EQUALS, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitTruth(MethodParser.TruthContext ctx) {
         String variable = getVariable(ctx.variable());
-        checkCondition(new MethodCondition(variable, EQUALS, BooleanQueryValue.TRUE), false);
+        checkCondition(new MethodCondition(variable, EQUALS, BooleanQueryValue.TRUE), false, false);
     }
 
     @Override
     public void exitUntruth(MethodParser.UntruthContext ctx) {
         String variable = getVariable(ctx.variable());
-        checkCondition(new MethodCondition(variable, EQUALS, BooleanQueryValue.FALSE), false);
+        checkCondition(new MethodCondition(variable, EQUALS, BooleanQueryValue.FALSE), false, false);
     }
 
     @Override
     public void exitGt(MethodParser.GtContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = GREATER_THAN;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(GREATER_THAN, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitGte(MethodParser.GteContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = GREATER_EQUALS_THAN;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(GREATER_EQUALS_THAN, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitLt(MethodParser.LtContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = LESSER_THAN;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(LESSER_THAN, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitLte(MethodParser.LteContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = LESSER_EQUALS_THAN;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(LESSER_EQUALS_THAN, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitLike(MethodParser.LikeContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = LIKE;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(LIKE, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitIn(MethodParser.InContext ctx) {
-        boolean hasNot = Objects.nonNull(ctx.not());
-        String variable = getVariable(ctx.variable());
-        Condition operator = IN;
-        appendCondition(hasNot, variable, operator);
+        exitOperationWithASingleVariable(IN, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitBetween(MethodParser.BetweenContext ctx) {
         boolean hasNot = Objects.nonNull(ctx.not());
+        boolean isIgnoreCase = Objects.nonNull(ctx.ignoreCase());
         String variable = getVariable(ctx.variable());
         Condition operator = BETWEEN;
         ArrayQueryValue value = MethodArrayValue.of(variable);
-        checkCondition(new MethodCondition(variable, operator, value), hasNot);
+        checkCondition(new MethodCondition(variable, operator, value), hasNot, isIgnoreCase);
     }
 
     @Override
     public void exitNullable(MethodParser.NullableContext ctx) {
         boolean hasNot = Objects.nonNull(ctx.not());
         String variable = getVariable(ctx.variable());
-        checkCondition(new MethodCondition(variable, EQUALS, StringQueryValue.of(null)), hasNot);
+        checkCondition(new MethodCondition(variable, EQUALS, StringQueryValue.of(null)), hasNot, false);
     }
 
     @Override
@@ -185,12 +169,12 @@ abstract class AbstractMethodQueryProvider extends MethodBaseListener {
 
     @Override
     public void exitContains(MethodParser.ContainsContext ctx) {
-        throw new UnsupportedOperationException("Contains is not supported in Eclipse JNoSQL method query");
+        exitOperationWithASingleVariable(CONTAINS, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
     public void exitEndsWith(MethodParser.EndsWithContext ctx) {
-        throw new UnsupportedOperationException("EndsWith is not supported in Eclipse JNoSQL method query");
+        exitOperationWithASingleVariable(ENDS_WITH, ctx.not(), ctx.variable(), ctx.ignoreCase());
     }
 
     @Override
@@ -198,19 +182,23 @@ abstract class AbstractMethodQueryProvider extends MethodBaseListener {
         throw new UnsupportedOperationException("StartsWith is not supported in Eclipse JNoSQL method query");
     }
 
-    @Override
-    public void exitIgnoreCase(MethodParser.IgnoreCaseContext ctx) {
-        throw new UnsupportedOperationException("IgnoreCase is not supported in Eclipse JNoSQL method query");
+    private void exitOperationWithASingleVariable(Condition operator, MethodParser.NotContext notContext,
+            MethodParser.VariableContext variableContext, MethodParser.IgnoreCaseContext ignoreCaseContext) {
+        boolean hasNot = Objects.nonNull(notContext);
+        boolean isIgnoreCase = Objects.nonNull(ignoreCaseContext);
+        String variable = getVariable(variableContext);
+        appendCondition(hasNot, isIgnoreCase, variable, operator);
     }
 
-    private void appendCondition(boolean hasNot, String variable, Condition operator) {
+    private void appendCondition(boolean hasNot, boolean isIgnoreCase, String variable, Condition operator) {
         ParamQueryValue queryValue = new MethodParamQueryValue(variable);
-        checkCondition(new MethodCondition(variable, operator, queryValue), hasNot);
+        checkCondition(new MethodCondition(variable, operator, queryValue), hasNot, isIgnoreCase);
     }
 
-
-    private void checkCondition(QueryCondition condition, boolean hasNot) {
-        QueryCondition newCondition = checkNotCondition(condition, hasNot);
+    private void checkCondition(QueryCondition condition, boolean hasNot, boolean isIgnoreCase) {
+        QueryCondition newCondition = condition;
+        newCondition = checkIgnoreCaseCondition(newCondition, isIgnoreCase);
+        newCondition = checkNotCondition(newCondition, hasNot);
         if (Objects.isNull(this.condition)) {
             this.condition = newCondition;
             return;
@@ -220,7 +208,6 @@ abstract class AbstractMethodQueryProvider extends MethodBaseListener {
         } else {
             appendCondition(OR, newCondition);
         }
-
     }
 
     private String getVariable(MethodParser.VariableContext ctx) {
@@ -253,6 +240,15 @@ abstract class AbstractMethodQueryProvider extends MethodBaseListener {
         if (hasNot) {
             ConditionQueryValue conditions = ConditionQueryValue.of(Collections.singletonList(condition));
             return new MethodCondition("_NOT", NOT, conditions);
+        } else {
+            return condition;
+        }
+    }
+
+    private QueryCondition checkIgnoreCaseCondition(QueryCondition condition, boolean isIgnoreCase) {
+        if (isIgnoreCase) {
+            ConditionQueryValue conditions = ConditionQueryValue.of(Collections.singletonList(condition));
+            return new MethodCondition("_IGNORE_CASE", IGNORE_CASE, conditions);
         } else {
             return condition;
         }
