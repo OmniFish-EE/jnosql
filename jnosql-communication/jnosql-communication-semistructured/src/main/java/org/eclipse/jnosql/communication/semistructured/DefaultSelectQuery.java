@@ -24,6 +24,14 @@ import static java.util.Optional.ofNullable;
 
 /**
  * The default implementation of column query.
+ *
+ * @param limit the limit
+ * @param skip the skip
+ * @param name the name
+ * @param columns the columns
+ * @param sorts the sorts
+ * @param criteriaCondition the criteriaCondition
+ * @param count the count
  */
 public record DefaultSelectQuery(long limit, long skip, String name,
                           List<String> columns, List<Sort<?>> sorts, CriteriaCondition criteriaCondition, boolean count)

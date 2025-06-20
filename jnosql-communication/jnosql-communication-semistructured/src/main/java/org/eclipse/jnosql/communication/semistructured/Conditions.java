@@ -17,6 +17,9 @@ import org.eclipse.jnosql.communication.query.ConditionQueryValue;
 import org.eclipse.jnosql.communication.query.QueryCondition;
 import org.eclipse.jnosql.communication.query.Where;
 
+/**
+ * Some class having something to do with some Conditions
+ */
 public final class Conditions {
 
     private Conditions() {

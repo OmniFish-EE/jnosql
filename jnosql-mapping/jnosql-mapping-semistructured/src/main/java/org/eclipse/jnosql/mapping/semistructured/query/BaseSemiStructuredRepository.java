@@ -20,6 +20,15 @@ import jakarta.data.Sort;
 import jakarta.data.page.Page;
 import jakarta.data.page.PageRequest;
 import jakarta.data.restrict.Restriction;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
 import org.eclipse.jnosql.communication.Params;
 import org.eclipse.jnosql.communication.query.method.DeleteMethodProvider;
 import org.eclipse.jnosql.communication.query.method.SelectMethodProvider;
@@ -40,14 +49,6 @@ import org.eclipse.jnosql.mapping.metadata.EntityMetadata;
 import org.eclipse.jnosql.mapping.metadata.InheritanceMetadata;
 import org.eclipse.jnosql.mapping.semistructured.MappingQuery;
 import org.eclipse.jnosql.mapping.semistructured.SemiStructuredTemplate;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 /**
  * A base abstract class for implementing column-oriented repositories in a Java NoSQL database.
@@ -254,12 +255,12 @@ public abstract class BaseSemiStructuredRepository<T, K> extends AbstractReposit
                 List<Sort<?>> sorts = new ArrayList<>(selectQuery.sorts());
                 sorts.addAll(special.sorts());
                 return new MappingQuery(sorts, selectQuery.limit(), selectQuery.skip(),
-                        selectQuery.condition().orElse(null), selectQuery.name());
+                        selectQuery.condition().orElse(null), selectQuery.name(), selectQuery.columns());
             }
            return selectQuery;
         });
     }
-    
+
     private SelectQuery includeRestrictCondition(SpecialParameters special, SelectQuery selectQuery) {
         Restriction<?> restriction = special.restriction().orElseThrow();
 
@@ -272,10 +273,10 @@ public abstract class BaseSemiStructuredRepository<T, K> extends AbstractReposit
             if (conditionOptional.isPresent()) {
                 CriteriaCondition condition = conditionOptional.orElseThrow();
                 updateQuery = new MappingQuery(selectQuery.sorts(), selectQuery.limit(),
-                        selectQuery.skip(), condition.and(conditionConverted), selectQuery.name());
+                        selectQuery.skip(), condition.and(conditionConverted), selectQuery.name(), selectQuery.columns());
             } else {
                 updateQuery = new MappingQuery(selectQuery.sorts(), selectQuery.limit(),
-                        selectQuery.skip(), conditionConverted, selectQuery.name());
+                        selectQuery.skip(), conditionConverted, selectQuery.name(), selectQuery.columns());
             }
         }
         return updateQuery;
